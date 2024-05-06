@@ -2,6 +2,9 @@ from django.db import models
 from django.conf import settings
 from django.db import models
 from django.core.validators import EmailValidator, MaxLengthValidator, MinLengthValidator
+import binascii
+from django.utils import timezone   
+import os
 
 
 # Create your models here.
@@ -33,3 +36,17 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return self.user.username
+class CustomToken(models.Model):
+    key = models.CharField(max_length=40)
+    user = models.OneToOneField(UserModel, related_name='custom_token', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    def generate_key(self):
+        self.key = binascii.hexlify(os.urandom(20)).decode()
+
+    def save(self, *args, **kwargs):
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.key
+    
