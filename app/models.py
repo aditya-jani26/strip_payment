@@ -25,3 +25,11 @@ class UserModel(models.Model):
     def __str__(self):
         return self.username
     
+class UserProfile(models.Model):
+    user = models.OneToOneField(UserModel, on_delete=models.CASCADE)
+    stripe_customer_id = models.CharField(max_length=255, null=True, blank=True)  # Assuming this field stores the Stripe customer ID
+
+    # Additional fields related to the user profile can be added here
+
+    def __str__(self):
+        return self.user.username

@@ -1,15 +1,16 @@
 import re
-from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from .models import *
 from .serializers import *
 from rest_framework.response import Response
 from django.contrib.auth.hashers import check_password
+from django.shortcuts import render,redirect
+import stripe
 
 # Create your views here.
 # ===============================--basic--==================================
-
 class RegisterView(APIView):
+
     def post(self, request):
         user = UserModel.objects.filter(username = request.data['username'])
         # validation 
@@ -57,7 +58,67 @@ class LoginView(APIView):
         except Exception as e:
             return Response({'msg': 'You are not registered user!','status':'error'}, status= 404)
 # =============================---basic---====================================
-# now here i want to implement ---cronjob--- and ---coustome token--- method also include ---paymentgateway----
-
-
+# now here i want to implement ---cronjob--- and ---coustome token--- also include ---paymentgateway----
 # =================================================================================================
+
+stripe.api_key = 'STRIPE_secretkey'
+
+class WalletInfoAPIView(APIView):
+    def get(self, request):
+        try:
+            customer_id = request.user.profile.stripe_customer_id
+            customer = stripe.Customer.retrieve(customer_id)
+            payment_methods = stripe.PaymentMethod.list(customer=customer_id, type="card")
+            transactions = stripe.PaymentIntent.list(customer=customer_id)
+
+            context = {
+                'customer': customer,
+                'payment_methods': payment_methods,
+                'transactions': transactions,
+            }
+
+            return render(request, 'wallet_info.html', context)
+        except stripe.error.StripeError as e:
+            return render(request, 'error.html', {'error_message': str(e)})
+
+class CreatePaymentIntentAPIView(APIView):
+    def post(self, request):
+        amount = int(request.data.get('amount', 0))  # Amount in cents
+        currency = 'usd'
+        description = 'Example payment'
+
+        try:
+            payment_intent = stripe.PaymentIntent.create(
+                amount=amount,
+                currency=currency,
+                description=description,
+                payment_method_types=['card'],
+            )
+
+            context = {
+                'client_secret': payment_intent.client_secret,
+                'amount': amount,
+                'currency': currency,
+            }
+
+            return render(request, 'payment.html', context)
+        except stripe.error.StripeError as e:
+            return render(request, 'error.html', {'error_message': str(e)})
+
+class SavePaymentMethodAPIView(APIView):
+    def post(self, request):
+        payment_method_id = request.data.get('payment_method_id')  
+        try:
+            customer_id = request.user.profile.stripe_customer_id
+
+            # Attach the payment method to the customer
+            stripe.PaymentMethod.attach(payment_method_id, customer=customer_id)
+
+            # Set it as the default payment method
+            stripe.Customer.modify(
+                customer_id,
+                invoice_settings={'default_payment_method': payment_method_id}
+            )
+            return redirect('wallet_info')  # Redirect to wallet info page
+        except stripe.error.StripeError as e:
+            return render(request, 'error.html', {'error_message': str(e)})

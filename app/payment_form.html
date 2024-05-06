@@ -1,0 +1,11 @@
+<form method="post" action="{% url 'create_payment_intent' %}">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Pay Now</button>
+  </form>       
+
+  <form method="post" action="{% url 'save_payment_method' %}">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Save Payment Method</button>
+  </form>        
